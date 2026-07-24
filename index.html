@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Animasi Partikel Hati 3D - Mobile Ready</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #000000; 
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      touch-action: none; /* Mencegah layar tertarik ke bawah/scroll di HP */
+    }
+    
+    svg {
+      display: none;
+    }
+    
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* CSS Teks Romantis (Responsif untuk HP) */
+    #romantic-text {
+      position: absolute;
+      z-index: 10;
+      color: #ffffff;
+      font-size: clamp(1.2rem, 5vw, 2.2rem); /* Ukuran otomatis pas di layar HP */
+      font-weight: 400;
+      letter-spacing: 1.5px;
+      text-align: center;
+      text-shadow: 0 0 10px #ff1493, 0 0 20px #ff1493, 0 0 30px #ff1493;
+      opacity: 0;
+      transform: scale(0.8);
+      pointer-events: none;
+      padding: 0 15px;
+      width: 100%;
+    }
+
+    /* Tombol Musik Latar */
+    #music-btn {
+      position: absolute;
+      bottom: 25px;
+      z-index: 20;
+      background: rgba(255, 20, 147, 0.3);
+      border: 1px solid #ff1493;
+      color: white;
+      padding: 10px 18px;
+      border-radius: 25px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      backdrop-filter: blur(5px);
+      box-shadow: 0 0 10px rgba(255, 20, 147, 0.5);
+      transition: all 0.3s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #music-btn:active {
+      transform: scale(0.95);
+    }
+  </style>
+  
+  <!-- Import Library CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+
+  <!-- Teks Romantis -->
+  <div id="romantic-text">I Love You ❤️</div>
+
+  <!-- Tombol Musik -->
+  <button id="music-btn">🎵 Putar Musik</button>
+
+  <!-- Audio Suara/Musik Latar -->
+  <audio id="bg-music" loop src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=romantic-piano-112199.mp3"></audio>
+
+  <!-- Jalur SVG tersembunyi sebagai acuan bentuk Hati -->
+  <svg viewBox="0 0 600 522">
+    <path id="svg-path" d="M300,150 C300,70 200,20 120,70 C40,120 40,220 120,300 C200,380 300,450 300,450 C300,450 400,380 480,300 C560,220 560,120 480,70 C400,20 300,70 300,150 Z" />
+  </svg>
+
+  <script>
+    // --- 1. SETUP THREE.JS SCENE, CAMERA, RENDERER & CONTROLS ---
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // --- MENGATUR KAMERA AGAR PAS DI HP (PORTRAIT / LANDSCAPE) ---
+    function adjustCameraForMobile() {
+      const aspect = window.innerWidth / window.innerHeight;
+      if (aspect < 1) {
+        // Layar Portrait HP: Kamera mundur otomatis agar objek tidak terpotong
+        camera.position.set(0, 0, 520 / aspect); 
+      } else {
+        // Layar Desktop / Landscape HP
+        camera.position.set(0, 0, 500);
+      }
+    }
+    adjustCameraForMobile();
+
+    // --- 2. DOKUMEN & VARIABEL KATA-KATA ---
+    const path = document.querySelector("#svg-path");
+    const romanticText = document.querySelector("#romantic-text");
+    const musicBtn = document.querySelector("#music-btn");
+    const bgMusic = document.querySelector("#bg-music");
+
+    // Daftar ucapan/kalimat yang akan dimunculkan
+    const messages = [
+      "I Love You ❤️",
+      "Kamu Alasan Senyumku ✨",
+      "Terima Kasih Sudah Ada 💕",
+      "Forever & Always 💖"
+    ];
+    let messageIndex = 0;
+
+    const length = path.getTotalLength();
+    const positions = [];
+    const targets = [];
+    
+    // Deteksi jika pengguna menggunakan layar HP
+    const isMobile = window.innerWidth < 768;
+    const step = isMobile ? 0.45 : 0.3; // Memeringankan kinerja HP
+
+    const svgWidth = 600;
+    const svgHeight = 522;
+
+    // Timeline GSAP
+    const mainTimeline = gsap.timeline({
+      repeat: -1,
+      yoyo: true,
+      repeatDelay: 3.5,
+      onRepeat: () => {
+        // Berganti kata-kata setiap kali animasi mengulang
+        messageIndex = (messageIndex + 1) % messages.length;
+        romanticText.textContent = messages[messageIndex];
+      }
+    });
+
+    const particleTimeline = gsap.timeline();
+
+    for (let i = 0; i < length; i += step) {
+      const point = path.getPointAtLength(i);
+      
+      const targetX = point.x - (svgWidth / 2) + (Math.random() - 0.5) * 20;
+      const targetY = -point.y + (svgHeight / 2) + (Math.random() - 0.5) * 20;
+      const targetZ = (Math.random() - 0.5) * 60;
+
+      const originX = 0;
+      const originY = 0;
+      const originZ = 0;
+
+      positions.push(originX, originY, originZ);
+
+      const particleVector = { x: originX, y: originY, z: originZ };
+      targets.push(particleVector);
+
+      particleTimeline.to(particleVector, {
+        x: targetX,
+        y: targetY,
+        z: targetZ,
+        ease: "power2.out",
+        duration: 2.5
+      }, i * 0.0015);
+    }
+
+    mainTimeline.add(particleTimeline);
+
+    // Animasi Teks Muncul
+    mainTimeline.to(romanticText, {
+      opacity: 1,
+      scale: 1,
+      duration: 1.2,
+      ease: "back.out(1.7)"
+    }, ">-0.5");
+
+    // --- 3. GEOMETRI DAN MATERIAL PARTIKEL ---
+    const geometry = new THREE.BufferGeometry();
+    const positionAttribute = new THREE.Float32BufferAttribute(positions, 3);
+    geometry.setAttribute('position', positionAttribute);
+
+    const material = new THREE.PointsMaterial({
+      color: 0xff69b4,
+      size: isMobile ? 2.8 : 2.2,
+      transparent: true,
+      opacity: 1,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const particles = new THREE.Points(geometry, material);
+    scene.add(particles);
+
+    let isFormed = false;
+
+    mainTimeline.eventCallback("onUpdate", () => {
+      if (mainTimeline.progress() > 0.8 && !isFormed) {
+        isFormed = true;
+      } else if (mainTimeline.progress() <= 0.8 && isFormed) {
+        isFormed = false;
+      }
+    });
+
+    // --- 4. RENDER LOOP ---
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const positionArray = geometry.attributes.position.array;
+      
+      for (let i = 0; i < targets.length; i++) {
+        const index = i * 3;
+        positionArray[index]     = targets[i].x;
+        positionArray[index + 1] = targets[i].y;
+        positionArray[index + 2] = targets[i].z;
+      }
+      
+      geometry.attributes.position.needsUpdate = true;
+      
+      if (isFormed) {
+        particles.rotation.y += 0.008;
+      } else {
+        particles.rotation.y = 0; 
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // --- EVENT FITUR MUSIK ---
+    let isPlaying = false;
+    musicBtn.addEventListener("click", () => {
+      if (!isPlaying) {
+        bgMusic.play();
+        musicBtn.textContent = "⏸️ Jeda Musik";
+        musicBtn.style.background = "rgba(255, 20, 147, 0.7)";
+      } else {
+        bgMusic.pause();
+        musicBtn.textContent = "🎵 Putar Musik";
+        musicBtn.style.background = "rgba(255, 20, 147, 0.3)";
+      }
+      isPlaying = !isPlaying;
+    });
+
+    // --- EVENT RESIZE LAYAR & ORIENTASI HP ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      adjustCameraForMobile();
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
